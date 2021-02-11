@@ -22,16 +22,49 @@
 #include "sdkconfig.h"
 #include "esp_timer.h"
 
+
+#ifdef CONFIG_IDF_TARGET_ESP32
+//#define RCV_HOST    HSPI_HOST
+//#define DMA_CHAN    2
+
+#elif defined CONFIG_IDF_TARGET_ESP32S2
+#define RCV_HOST    SPI2_HOST
+#define DMA_CHAN    RCV_HOST
+
+#elif defined CONFIG_IDF_TARGET_ESP32C3
+#define RCV_HOST    SPI2_HOST
+#define DMA_CHAN    RCV_HOST
+#endif
+
+
 //SPI
+
+#define HSPI 1
+//#define VSPI 2
+#define SPI_HOST HSPI
+
+#ifdef VSPI
 #define GPIO_HANDSHAKE 27
 #define GPIO_MOSI 23
 #define GPIO_MISO 19
 #define GPIO_SCLK 18
 #define GPIO_CS 26
+#elif defined HSPI
+#define GPIO_HANDSHAKE 27
+#define GPIO_MOSI 13
+#define GPIO_MISO 12
+#define GPIO_SCLK 14
+#define GPIO_CS 15
+#endif
+#define DMA_CHANNEL 1
 
 //SD
 #define MOUNT_POINT "/sdcard"
-
+#define SPI_DMA_CHAN    2
+#define SD_MOSI 23
+#define SD_MISO 19
+#define SD_SCLK 18
+#define SD_CS 26
 //BLINK
 #define PIN 32
 //34 can only be input
@@ -69,15 +102,16 @@ void blinky(void *params)
 }
 
 /******************************************/
-// SD INIT
+// SDIO INIT
 /******************************************/
-esp_err_t init_sd()
+esp_err_t init_sdio()
 {
   esp_err_t ret;
   esp_vfs_fat_sdmmc_mount_config_t mount_config = {
       .format_if_mount_failed = false,
       .max_files = 5,
-      .allocation_unit_size = 16 * 1024};
+      .allocation_unit_size = 16 * 1024
+      };
   sdmmc_card_t *card;
   const char mount_point[] = MOUNT_POINT;
   ESP_LOGI(TAG, "Initializing SD card");
@@ -90,6 +124,46 @@ esp_err_t init_sd()
   gpio_set_pull_mode(12, GPIO_PULLUP_ONLY); // D2, needed in 4-line mode only
   gpio_set_pull_mode(13, GPIO_PULLUP_ONLY); // D3, needed in 4- and 1-line modes
   ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
+  return ret;
+}
+
+/******************************************/
+// SD INIT
+/******************************************/
+esp_err_t init_sd()
+{
+  esp_err_t ret;
+  sdmmc_card_t *card;
+  esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+      .format_if_mount_failed = false,
+      .max_files = 5,
+      .allocation_unit_size = 16 * 1024
+      };  
+  const char mount_point[] = MOUNT_POINT;
+  ESP_LOGI(TAG, "Using SPI peripheral");
+
+  sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+  spi_bus_config_t bus_cfg = {
+      .mosi_io_num = SD_MOSI,
+      .miso_io_num = SD_MISO,
+      .sclk_io_num = SD_SCLK,
+      .quadwp_io_num = -1,
+      .quadhd_io_num = -1,
+      .max_transfer_sz = 4000,
+  };
+  ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CHAN);
+  if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize bus.");
+      return;
+  }
+
+  // This initializes the slot without card detect (CD) and write protect (WP) signals.
+  // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
+  sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+  slot_config.gpio_cs = SD_CS;
+  slot_config.host_id = host.slot;
+
+  ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
   return ret;
 }
 /******************************************/
@@ -155,6 +229,7 @@ void sd_write_buf(uint8_t buf[], size_t len)
   int64_t m2;
   m = esp_timer_get_time();
   printf("writing %u bytes to SD\n", len);
+  printf("%s \n", buf);
   FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
   if (f == NULL)
   {
@@ -194,6 +269,7 @@ esp_err_t init_spi_slave()
       .sclk_io_num = GPIO_SCLK,
       .quadwp_io_num = -1,
       .quadhd_io_num = -1,
+      .max_transfer_sz = 4094
   };
 
   spi_slave_interface_config_t slvcfg = {
@@ -202,7 +278,8 @@ esp_err_t init_spi_slave()
       .queue_size = 3,
       .flags = 0,
       .post_setup_cb = my_post_setup_cb,
-      .post_trans_cb = my_post_trans_cb};
+      .post_trans_cb = my_post_trans_cb
+      };
 
   gpio_config_t io_conf = {
       .intr_type = GPIO_INTR_DISABLE,
@@ -215,7 +292,7 @@ esp_err_t init_spi_slave()
   gpio_set_pull_mode(GPIO_CS, GPIO_PULLUP_ONLY);
 
   //Use SPI HOST 2
-  ret = spi_slave_initialize(2, &buscfg, &slvcfg, 0);
+  ret = spi_slave_initialize(SPI_HOST, &buscfg, &slvcfg, DMA_CHANNEL);
   return ret;
 }
 /******************************************/
@@ -223,21 +300,25 @@ esp_err_t init_spi_slave()
 /******************************************/
 void spi_task()
 {
-  WORD_ALIGNED_ATTR char spiSendBuf[33] = "";
-  WORD_ALIGNED_ATTR char spiRecvBuf[33] = "";
+  //WORD_ALIGNED_ATTR char spiSendBuf[129] = "";
+  //WORD_ALIGNED_ATTR char spiRecvBuf[129] = "";
+  WORD_ALIGNED_ATTR uint8_t* spiSendBuf = (uint8_t*)heap_caps_malloc(256,MALLOC_CAP_DMA);
+  WORD_ALIGNED_ATTR uint8_t* spiRecvBuf = (uint8_t*)heap_caps_malloc(256,MALLOC_CAP_DMA);  
   spi_slave_transaction_t t;
   memset(&t, 0, sizeof(t));
   while (1)
   {
-    memset(spiRecvBuf, 0x21, 33);
-    t.length = 256;
+    memset(spiRecvBuf, 0x21, 256);
+    memset(spiSendBuf, 0x21, 256);
+    //sprintf(spiSendBuf, "This is the receiver, sending data for transmission number");
+    t.length = 256*8;
     t.tx_buffer = spiSendBuf;
     t.rx_buffer = spiRecvBuf;
-    spi_slave_queue_trans(2, &t, portMAX_DELAY);
-    esp_err_t ret = spi_slave_get_trans_result(2, &t, portMAX_DELAY);
+    spi_slave_queue_trans(SPI_HOST, &t, portMAX_DELAY);
+    esp_err_t ret = spi_slave_get_trans_result(SPI_HOST, &t, portMAX_DELAY);
     assert(ret == ESP_OK);
     printf("Received %u bytes: %s \n", t.trans_len / 8, spiRecvBuf);
-    sd_write_buf(&spiRecvBuf, t.trans_len / 8);
+    sd_write_buf(spiRecvBuf, t.trans_len / 8);
   }
 }
 /******************************************/
