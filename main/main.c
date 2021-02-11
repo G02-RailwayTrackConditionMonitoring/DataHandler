@@ -354,7 +354,7 @@ static void uart_task(void *arg)
     printf("****\n");
     printf("Transmitting %d bytes: %s \n", sizeof(uartSendBuf), uartSendBuf);
     uart_write_bytes(ECHO_UART_PORT_NUM, uartSendBuf, sizeof(uartSendBuf));
-    uart_read_bytes(ECHO_UART_PORT_NUM, uartRecvBuf, 32, 20 / portTICK_RATE_MS);
+    uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)uartRecvBuf, 32, 20 / portTICK_RATE_MS);
     printf("Received: %s\n", uartRecvBuf);
     printf("****\n");
     vTaskDelay(5000 / portTICK_PERIOD_MS);
