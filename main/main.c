@@ -167,6 +167,10 @@ host.slot =VSPI_HOST;
   slot_config.host_id = host.slot;
 
   ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+  
+  //Open then close, in "w" mode, to reset the file on startup.
+  FILE *f = fopen(MOUNT_POINT "/testing.txt", "w");
+  fclose(f);
   return ret;
 }
 /******************************************/
@@ -191,7 +195,7 @@ void sd_benchmark()
   buf[512 - 2] = '\r';
   while (true)
   {
-    FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
+    FILE *f = fopen(MOUNT_POINT "/testing.txt", "w");
     if (f == NULL)
     {
       ESP_LOGE("SD", "Failed to open file for writing");
