@@ -354,16 +354,18 @@ static void uart_task(void *arg)
 {
   char uartSendBuf[33] = "";
   char uartRecvBuf[33] = "";
+  uint32_t tx_count =0;
   while (1)
   {
-    sprintf(uartSendBuf, "Testing UART\n");
+    sprintf(uartSendBuf, "%d Testing UART\n",tx_count);
     printf("****\n");
     printf("Transmitting %d bytes: %s \n", sizeof(uartSendBuf), uartSendBuf);
     uart_write_bytes(ECHO_UART_PORT_NUM, uartSendBuf, sizeof(uartSendBuf));
     uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)uartRecvBuf, 32, 20 / portTICK_RATE_MS);
     printf("Received: %s\n", uartRecvBuf);
     printf("****\n");
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    tx_count++;
+    vTaskDelay(pdMS_TO_TICKS(120000));//Every 2 minutes
   }
 }
 
