@@ -152,6 +152,8 @@ esp_err_t init_sd()
       .quadhd_io_num = -1,
       .max_transfer_sz = 4000,
   };
+host.slot =VSPI_HOST;
+
   ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CHAN);
   if (ret != ESP_OK) {
       ESP_LOGE(TAG, "Failed to initialize bus.");
