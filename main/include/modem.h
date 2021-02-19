@@ -35,7 +35,6 @@
 #define BUF_SIZE_UART 1024
 
 
-
 esp_err_t init_spi_slave();
 
 void init_uart();

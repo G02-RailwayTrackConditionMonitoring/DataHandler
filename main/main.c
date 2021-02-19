@@ -174,7 +174,7 @@ void app_main(void)
   };
 
   xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
-  xTaskCreate(&spi_task, "spi-receive", 2048, NULL, 2, NULL); //SD Write is daisy chained to this
+  xTaskCreate(&spi_task, "spi-receive", 2600, NULL, 2, NULL); //SD Write is daisy chained to this
   xTaskCreate(&uart_task, "uart-transmit", 2048, NULL, 3, NULL);
 
   //xTaskCreate(&sd_benchmark, "sd-write", 2048, NULL, 2, NULL);

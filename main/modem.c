@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include <string.h>
 
+
 #include "sd_card.h"
 
 static const char* TAG = "MODEM";
@@ -79,6 +80,8 @@ void spi_task()
   //WORD_ALIGNED_ATTR char spiRecvBuf[129] = "";
   WORD_ALIGNED_ATTR uint8_t* spiSendBuf = (uint8_t*)heap_caps_malloc(256,MALLOC_CAP_DMA);
   WORD_ALIGNED_ATTR uint8_t* spiRecvBuf = (uint8_t*)heap_caps_malloc(256,MALLOC_CAP_DMA);  
+  uint8_t sdBuffer[512] = {0};
+  uint16_t sdBuffIdx = 0;
   spi_slave_transaction_t t;
   memset(&t, 0, sizeof(t));
   while (1)
@@ -94,7 +97,18 @@ void spi_task()
     assert(ret == ESP_OK);
     gpio_set_level(4,1);
     printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
-    sd_write_buf(spiRecvBuf, t.trans_len / 8);
+
+    //Empty the SPI rx buffer to a different buffer.
+    memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,t.trans_len / 8);
+    sdBuffIdx += (t.trans_len / 8);
+
+    //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
+    ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
+    if(sdBuffIdx >= 480){
+      sd_write_buf(sdBuffer, sdBuffIdx);
+      sdBuffIdx = 0;
+    }
+
     gpio_set_level(4,0);
   }
 }
