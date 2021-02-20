@@ -98,9 +98,10 @@ void spi_task()
     gpio_set_level(4,1);
     printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
 
+    //last byte tells which node. for now just ignore the last byte.
     //Empty the SPI rx buffer to a different buffer.
-    memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,t.trans_len / 8);
-    sdBuffIdx += (t.trans_len / 8);
+    memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
+    sdBuffIdx += ((t.trans_len / 8)-1);
 
     //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
     ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
