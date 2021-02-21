@@ -18,6 +18,7 @@
     "spi_master.h": "c",
     "sdmmc_host.h": "c",
     "esp_log.h": "c",
-    "spi_common.h": "c"
+    "spi_common.h": "c",
+    "gatewaycommands.h": "c"
   }
 }
