@@ -25,6 +25,7 @@
 
 #include "sd_card.h"
 #include "modem.h"
+#include "dataProcessing.h"
 
 #ifdef CONFIG_IDF_TARGET_ESP32
 //#define RCV_HOST    HSPI_HOST
@@ -45,7 +46,7 @@
 #define PIN 32
 //34 can only be input
 
-
+QueueHandle_t dataQueue;
 static const char* TAG = "CONFIG";
 
 /******************************************/
@@ -146,12 +147,12 @@ static bool test_region(int check_size, int seed)
 void app_main(void)
 {
 
-  //Testing the remaining 4MB of RAM 
-  size_t memcnt=esp_himem_get_phys_size();
-  size_t memfree=esp_himem_get_free_size();
-  printf("Himem has %dKiB of memory, %dKiB of which is free. Testing the free memory...\n", (int)memcnt/1024, (int)memfree/1024);
-  assert(test_region(memfree, 0xaaaa));
-  printf("Done!\n");
+  // //Testing the remaining 4MB of RAM 
+  // size_t memcnt=esp_himem_get_phys_size();
+  // size_t memfree=esp_himem_get_free_size();
+  // printf("Himem has %dKiB of memory, %dKiB of which is free. Testing the free memory...\n", (int)memcnt/1024, (int)memfree/1024);
+  // assert(test_region(memfree, 0xaaaa));
+  // printf("Done!\n");
 
 
   esp_err_t ret;
@@ -173,9 +174,12 @@ void app_main(void)
     };
   };
 
+  dataQueue = xQueueCreate(10,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
   xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
-  xTaskCreate(&spi_task, "spi-receive", 2600, NULL, 2, NULL); //SD Write is daisy chained to this
-  xTaskCreate(&uart_task, "uart-transmit", 2048, NULL, 3, NULL);
+  xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
+  xTaskCreate(&uart_task, "uart-receive", 4096,NULL, 3, NULL);
+  xTaskCreate(&processingTask,"processing",4096,(void*)dataQueue,2,NULL);
+
 
   //xTaskCreate(&sd_benchmark, "sd-write", 2048, NULL, 2, NULL);
 }

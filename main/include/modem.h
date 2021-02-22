@@ -39,7 +39,7 @@ esp_err_t init_spi_slave();
 
 void init_uart();
 
-void spi_task();
+void spi_task(void* pvParams);
 
 void uart_task(void *arg);
 

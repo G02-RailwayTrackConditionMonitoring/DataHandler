@@ -9,6 +9,7 @@
 #include "driver/spi_common.h"
 #include "driver/uart.h"
 #include "driver/spi_slave.h"
+#include "esp_vfs_fat.h"
 #include "esp_log.h"
 #include <string.h>
 
@@ -17,6 +18,11 @@
 #include "GatewayCommands.h"
 
 static const char* TAG = "MODEM";
+
+int8_t handleCommand(GatewayUartPacket packet);
+
+uint8_t dataBuffer[10*245];
+uint16_t dataBufferIdx=0;
 
 /******************************************/
 // SPI
@@ -75,8 +81,10 @@ esp_err_t init_spi_slave()
 /******************************************/
 //SPI TASK
 /******************************************/
-void spi_task()
+void spi_task(void* pvParams)
 {
+
+  QueueHandle_t dataQueue = (QueueHandle_t)pvParams;
   //WORD_ALIGNED_ATTR char spiSendBuf[129] = "";
   //WORD_ALIGNED_ATTR char spiRecvBuf[129] = "";
   WORD_ALIGNED_ATTR uint8_t* spiSendBuf = (uint8_t*)heap_caps_malloc(256,MALLOC_CAP_DMA);
@@ -87,8 +95,8 @@ void spi_task()
   memset(&t, 0, sizeof(t));
   while (1)
   {
-    memset(spiRecvBuf, 0x21, 256);
-    memset(spiSendBuf, 0x21, 256);
+    //memset(spiRecvBuf, 0x21, 256);
+    //memset(spiSendBuf, 0x21, 256);
     //sprintf(spiSendBuf, "This is the receiver, sending data for transmission number");
     t.length = 256*8;
     t.tx_buffer = spiSendBuf;
@@ -96,22 +104,43 @@ void spi_task()
     spi_slave_queue_trans(HSPI_HOST, &t, portMAX_DELAY);
     esp_err_t ret = spi_slave_get_trans_result(HSPI_HOST, &t, portMAX_DELAY);
     assert(ret == ESP_OK);
-    gpio_set_level(4,1);
-    printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
-
-    //last byte tells which node. for now just ignore the last byte.
-    //Empty the SPI rx buffer to a different buffer.
-    memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
-    sdBuffIdx += ((t.trans_len / 8)-1);
-
-    //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
-    ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
-    if(sdBuffIdx >= 480){
-      sd_write_buf(sdBuffer, sdBuffIdx);
-      sdBuffIdx = 0;
-    }
-
     gpio_set_level(4,0);
+    //printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
+    //ESP_LOGI(TAG,"received %d bytes",t.trans_len/8);
+    //Make sure we ahve real data otherwise we get hard fault.
+    if((t.trans_len/8) > (8*5)){
+      
+      gpio_set_level(4,1);
+      //last byte tells which node. for now just ignore the last byte.
+      //Empty the SPI rx buffer to a different buffer.
+      memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
+      sdBuffIdx += ((t.trans_len / 8)-1);
+      uint8_t* ptr = &dataBuffer[dataBufferIdx];
+      //Send data to processing task through queue. 
+      gpio_set_level(4,0);
+
+      memcpy(ptr,spiRecvBuf,245);
+      gpio_set_level(4,1);
+      BaseType_t err =  xQueueSendToBack(dataQueue,&ptr,0);
+      gpio_set_level(4,0);
+      dataBufferIdx = (dataBufferIdx+245)%(10*245);
+      //printf("buf idx %d\n",dataBufferIdx);
+      if(err != pdTRUE){ 
+        ESP_LOGW(TAG,"processing queue full!");
+        //Should write this to the sd card log.
+      }
+
+      gpio_set_level(4,1);
+      //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
+      //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
+      if(sdBuffIdx >= 480){
+        sd_write_buf(sdBuffer, sdBuffIdx);
+        sdBuffIdx = 0;
+      }
+
+      gpio_set_level(4,0);
+    }
+    
   }
 }
 /******************************************/
@@ -138,30 +167,106 @@ void init_uart()
 /******************************************/
 void uart_task(void *arg)
 {
-  char uartSendBuf[33] = "";
-  char uartRecvBuf[33] = "";
-  int16_t tx_count =-10;
   
+  char uartRecvBuf[255] = "";
+  uint8_t uartRxIdx = 0;
+  uint8_t rxLen = 0;
   GatewayUartPacket packet;
-  packet.command = AVG_FORCE_DATA;
-  packet.data.int16[0] = tx_count;
-  packet.len = sizeof(int16_t)*1;//sending one int16_t value.
+  // packet.command = AVG_FORCE_DATA;
+  // packet.data.int16[0] = tx_count;
+  // packet.len = sizeof(int16_t)*1;//sending one int16_t value.
 
-  uint8_t bytesToSend = PreparePacket((uint8_t*)uartSendBuf,&packet);
+  // uint8_t bytesToSend = PreparePacket((uint8_t*)uartSendBuf,&packet);
   while (1)
   {
+    //Read one bytes at a time
+    uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)(&uartRecvBuf[uartRxIdx]), 1, portMAX_DELAY);
+    ESP_LOGI(TAG,"read Uart Byte");
+    if(uartRxIdx == 1){
+    //This is always the len byte.
+        rxLen = uartRecvBuf[uartRxIdx];
+    }
+    uartRxIdx++;
+
+    //If count = len  then we have a full command.
+    //If uartRxIdx is 0 or 1 we don't have a valid length yet.
+    if((uartRxIdx >= rxLen) && uartRxIdx>1){
+        uartRxIdx = 0;
+        rxLen = 0;
+
+        
+        GetPacket((uint8_t*)uartRecvBuf,&packet);
+        handleCommand(packet);
+    }
+
+  
     // sprintf(uartSendBuf, "%d Testing UART\n",tx_count);
     // printf("****\n");
-    printf("Transmitting %d bytes: %s \n", sizeof(uartSendBuf), uartSendBuf);
-    uart_write_bytes(ECHO_UART_PORT_NUM, uartSendBuf, bytesToSend);
-    uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)uartRecvBuf, 32, 20 / portTICK_RATE_MS);
+    // printf("Transmitting %d bytes: %s \n", sizeof(uartSendBuf), uartSendBuf);
+    // uart_write_bytes(ECHO_UART_PORT_NUM, uartSendBuf, bytesToSend);
+    
     // printf("Received: %s\n", uartRecvBuf);
     // printf("****\n");
-    tx_count++;
+    // tx_count++;
 
-    packet.data.int16[0] = tx_count;
-    bytesToSend = PreparePacket((uint8_t*)uartSendBuf,&packet);
+    // packet.data.int16[0] = tx_count;
+    // bytesToSend = PreparePacket((uint8_t*)uartSendBuf,&packet);
 
-    vTaskDelay(pdMS_TO_TICKS(12000));//Every 2 minutes
+    // vTaskDelay(pdMS_TO_TICKS(60000));//Every 2 minutes
   }
+}
+
+int8_t handleCommand(GatewayUartPacket packet){
+
+  ESP_LOGI(TAG,"Handling uart command.");
+
+  switch(packet.command){
+
+    case BLE_CONNECTION_EVENT:{
+                                uint8_t con = packet.data.uint8[0];
+                                uint8_t node_id = packet.data.uint8[1];
+                                ESP_LOGI(TAG,"Received uart command: BLE Connection conn:%d, node:%d",con,node_id);
+
+                                FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                                fprintf(f,"%d BLE_CONNECTION_EVENT: connected(%d), node_id(%d)\n",xTaskGetTickCount(),con,node_id);
+                                fclose(f);
+                                
+                                break;
+    }
+
+    case TIME_UPDATE:{
+                        uint8_t month = packet.data.uint8[0];
+                        uint8_t day = packet.data.uint8[1];
+                        uint8_t hour = packet.data.uint8[2];
+                        uint8_t minute = packet.data.uint8[3];
+                        uint8_t second = packet.data.uint8[4];
+                        ESP_LOGI(TAG,"TIME_UPDATE: /%d/%d %d:%d:%d",month,day,hour,minute,second);
+                        
+                        FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                        fprintf(f,"%d TIME_UPDATE: /%d/%d %d:%d:%d\n",xTaskGetTickCount(),month,day,hour,minute,second);
+                        fclose(f);
+                        
+                        break;
+    }
+
+    case LTE_RSSI_DATA:{
+                        
+                        float signalStrength = packet.data.float32[0];
+                        ESP_LOGI(TAG,"LTE_RSSI_DATA: %f",signalStrength);
+
+                        FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                        ESP_LOGI(TAG,"Log file opened.");
+                        fprintf(f,"%d LTE_RSSI_DATA: %f%%\n",xTaskGetTickCount(),signalStrength);
+                        ESP_LOGI(TAG,"Log file written.");
+                        fclose(f);
+                        ESP_LOGI(TAG,"Log file closed.");
+                        break;
+    }
+
+    default:  ESP_LOGI(TAG,"Received unknown UART command.");
+              return -1;
+              break;
+  }
+  return 0;
+
 }
