@@ -1,6 +1,18 @@
 #include "GatewayCommands.h"
 #include <string.h>
 
+const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS]={
+    "AVG_FORCE_DATA",
+    "BLE_CONNECTION_EVENT",
+    "BLE_RSSI_DATA",
+    "LTE_RSSI_DATA",
+    "NODE_BATTERY",
+    "GATEWAY_BATTERY",
+    "NODE_FREE_SPACE",
+    "GATEWAY_FREE_SPACE",
+    "TIME_UPDATE",
+};
+
 uint8_t PreparePacket(uint8_t* buffer, GatewayUartPacket* packet){
 
     uint8_t totalLen = packet->len+2;

@@ -174,6 +174,10 @@ void app_main(void)
     };
   };
 
+  FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  fprintf(f,"%d ESP32_POWER_ON \n",xTaskGetTickCount());
+  fclose(f);
+
   dataQueue = xQueueCreate(10,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
   xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
   xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.

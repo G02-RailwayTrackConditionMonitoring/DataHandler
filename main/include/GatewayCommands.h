@@ -25,6 +25,8 @@ typedef enum{
     NUM_GATEWAY_COMMANDS
 } GatewayCommand_t;
 
+extern const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS];
+
 typedef union {
     uint8_t uint8[252];
     uint16_t uint16[126];

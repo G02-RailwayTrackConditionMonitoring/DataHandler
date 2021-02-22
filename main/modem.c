@@ -19,7 +19,7 @@
 
 static const char* TAG = "MODEM";
 
-int8_t handleCommand(GatewayUartPacket packet);
+int8_t handleCommand(char cmdString[]);
 
 uint8_t dataBuffer[10*245];
 uint16_t dataBufferIdx=0;
@@ -170,8 +170,8 @@ void uart_task(void *arg)
   
   char uartRecvBuf[255] = "";
   uint8_t uartRxIdx = 0;
-  uint8_t rxLen = 0;
-  GatewayUartPacket packet;
+  //uint8_t rxLen = 0;
+  //GatewayUartPacket packet;
   // packet.command = AVG_FORCE_DATA;
   // packet.data.int16[0] = tx_count;
   // packet.len = sizeof(int16_t)*1;//sending one int16_t value.
@@ -181,23 +181,33 @@ void uart_task(void *arg)
   {
     //Read one bytes at a time
     uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)(&uartRecvBuf[uartRxIdx]), 1, portMAX_DELAY);
-    ESP_LOGI(TAG,"read Uart Byte");
-    if(uartRxIdx == 1){
-    //This is always the len byte.
-        rxLen = uartRecvBuf[uartRxIdx];
-    }
-    uartRxIdx++;
+    ESP_LOGI(TAG,"read Uart Byte %c",uartRecvBuf[uartRxIdx]);
 
-    //If count = len  then we have a full command.
-    //If uartRxIdx is 0 or 1 we don't have a valid length yet.
-    if((uartRxIdx >= rxLen) && uartRxIdx>1){
-        uartRxIdx = 0;
-        rxLen = 0;
+    if(uartRecvBuf[uartRxIdx] == '\n'){
+      uartRxIdx++;
+      uartRecvBuf[uartRxIdx] =0; //Null terminate the string.
+      handleCommand(uartRecvBuf);
+      uartRxIdx = 0; //Reset index.
+    }
+    else{
+      uartRxIdx++;
+    }
+    // if(uartRxIdx == 1){
+    // //This is always the len byte.
+    //     rxLen = uartRecvBuf[uartRxIdx];
+    // }
+    // uartRxIdx++;
+
+    // //If count = len  then we have a full command.
+    // //If uartRxIdx is 0 or 1 we don't have a valid length yet.
+    // if((uartRxIdx >= rxLen) && uartRxIdx>1){
+    //     uartRxIdx = 0;
+    //     rxLen = 0;
 
         
-        GetPacket((uint8_t*)uartRecvBuf,&packet);
-        handleCommand(packet);
-    }
+    //     GetPacket((uint8_t*)uartRecvBuf,&packet);
+    //     handleCommand(packet);
+    // }
 
   
     // sprintf(uartSendBuf, "%d Testing UART\n",tx_count);
@@ -216,56 +226,74 @@ void uart_task(void *arg)
   }
 }
 
-int8_t handleCommand(GatewayUartPacket packet){
+int8_t handleCommand(char cmdString[]){
 
-  ESP_LOGI(TAG,"Handling uart command.");
+ 
 
-  switch(packet.command){
+  char* command = strtok(cmdString,":");
+  ESP_LOGI(TAG,"Handling command:%s -> %s",cmdString,command);
+  uint8_t commandNum = atoi(command);
+
+  if(commandNum>NUM_GATEWAY_COMMANDS){
+    ESP_LOGW(TAG,"Received unknown UART command.");
+    
+  }
+
+  char* data = strtok(NULL,":");
+
+  //Log to file along with tick count.
+  FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  fprintf(f,"%d %s:%s",xTaskGetTickCount(),GatewayCommand_Str[commandNum],data);
+  fclose(f);
+
+  ESP_LOGI(TAG,"%s:%s",GatewayCommand_Str[commandNum],data);
+  //If we actually want to do something based on the commmand/data.
+  switch(commandNum){
 
     case BLE_CONNECTION_EVENT:{
-                                uint8_t con = packet.data.uint8[0];
-                                uint8_t node_id = packet.data.uint8[1];
-                                ESP_LOGI(TAG,"Received uart command: BLE Connection conn:%d, node:%d",con,node_id);
+                                // uint8_t con = packet.data.uint8[0];
+                                // uint8_t node_id = packet.data.uint8[1];
+                                // ESP_LOGI(TAG,"Received uart command: BLE Connection conn:%d, node:%d",con,node_id);
 
-                                FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
-                                fprintf(f,"%d BLE_CONNECTION_EVENT: connected(%d), node_id(%d)\n",xTaskGetTickCount(),con,node_id);
-                                fclose(f);
+                                // FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                                // fprintf(f,"%d BLE_CONNECTION_EVENT: connected(%d), node_id(%d)\n",xTaskGetTickCount(),con,node_id);
+                                // fclose(f);
                                 
                                 break;
     }
 
     case TIME_UPDATE:{
-                        uint8_t month = packet.data.uint8[0];
-                        uint8_t day = packet.data.uint8[1];
-                        uint8_t hour = packet.data.uint8[2];
-                        uint8_t minute = packet.data.uint8[3];
-                        uint8_t second = packet.data.uint8[4];
-                        ESP_LOGI(TAG,"TIME_UPDATE: /%d/%d %d:%d:%d",month,day,hour,minute,second);
+                        // uint8_t month = packet.data.uint8[0];
+                        // uint8_t day = packet.data.uint8[1];
+                        // uint8_t hour = packet.data.uint8[2];
+                        // uint8_t minute = packet.data.uint8[3];
+                        // uint8_t second = packet.data.uint8[4];
+                        // ESP_LOGI(TAG,"TIME_UPDATE: /%d/%d %d:%d:%d",month,day,hour,minute,second);
                         
-                        FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
-                        fprintf(f,"%d TIME_UPDATE: /%d/%d %d:%d:%d\n",xTaskGetTickCount(),month,day,hour,minute,second);
-                        fclose(f);
+                        // FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                        // fprintf(f,"%d TIME_UPDATE: /%d/%d %d:%d:%d\n",xTaskGetTickCount(),month,day,hour,minute,second);
+                        // fclose(f);
                         
                         break;
     }
 
     case LTE_RSSI_DATA:{
                         
-                        float signalStrength = packet.data.float32[0];
-                        ESP_LOGI(TAG,"LTE_RSSI_DATA: %f",signalStrength);
+                        // float signalStrength = packet.data.float32[0];
+                        // ESP_LOGI(TAG,"LTE_RSSI_DATA: %f",signalStrength);
 
-                        FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
-                        ESP_LOGI(TAG,"Log file opened.");
-                        fprintf(f,"%d LTE_RSSI_DATA: %f%%\n",xTaskGetTickCount(),signalStrength);
-                        ESP_LOGI(TAG,"Log file written.");
-                        fclose(f);
-                        ESP_LOGI(TAG,"Log file closed.");
+                        // FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+                        // // ESP_LOGI(TAG,"Log file opened.");
+                        // fprintf(f,"%d LTE_RSSI_DATA: %f%%\n",xTaskGetTickCount(),signalStrength);
+                        // // ESP_LOGI(TAG,"Log file written.");
+                        // fclose(f);
+                        // ESP_LOGI(TAG,"Log file closed.");
                         break;
     }
 
-    default:  ESP_LOGI(TAG,"Received unknown UART command.");
-              return -1;
-              break;
+    // default:  ESP_LOGI(TAG,"Received unknown UART command.");
+    //           return -1;
+              // break;
   }
   return 0;
 
