@@ -181,7 +181,7 @@ void uart_task(void *arg)
   {
     //Read one bytes at a time
     uart_read_bytes(ECHO_UART_PORT_NUM, (uint8_t*)(&uartRecvBuf[uartRxIdx]), 1, portMAX_DELAY);
-    ESP_LOGI(TAG,"read Uart Byte %c",uartRecvBuf[uartRxIdx]);
+    // ESP_LOGI(TAG,"read Uart Byte %c",uartRecvBuf[uartRxIdx]);
 
     if(uartRecvBuf[uartRxIdx] == '\n'){
       uartRxIdx++;

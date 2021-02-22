@@ -26,8 +26,8 @@ void processingTask(void * pvParams){
     xQueueReceive(dataQueue,&dataBuff,portMAX_DELAY);
 
     //Unpack the data.
-    uint8_t node_id = dataBuff[240];
-    uint32_t frameNum = *((uint32_t*)&dataBuff[241]);
+    uint8_t node_id = dataBuff[244];
+    uint32_t frameNum = *((uint32_t*)&dataBuff[240]);
 
     unPackSamples(dataBuff,xData,yData,zData,40);
 
