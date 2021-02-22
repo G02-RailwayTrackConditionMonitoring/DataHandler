@@ -21,6 +21,7 @@ typedef enum{
     GATEWAY_BATTERY,
     NODE_FREE_SPACE,
     GATEWAY_FREE_SPACE,
+    TIME_UPDATE,
     NUM_GATEWAY_COMMANDS
 } GatewayCommand_t;
 
