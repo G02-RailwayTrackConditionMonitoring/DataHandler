@@ -20,6 +20,11 @@
     "esp_log.h": "c",
     "spi_common.h": "c",
     "gatewaycommands.h": "c",
-    "task.h": "c"
+    "task.h": "c",
+    "sdkconfig.h": "c",
+    "spi_slave.h": "c",
+    "gpio.h": "c",
+    "uart.h": "c",
+    "himem.h": "c"
   }
 }

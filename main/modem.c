@@ -114,7 +114,7 @@ void spi_task(void* pvParams)
       //last byte tells which node. for now just ignore the last byte.
       //Empty the SPI rx buffer to a different buffer.
       memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
-      sdBuffIdx += ((t.trans_len / 8)-1);
+      sdBuffIdx += ((t.trans_len / 8)-5);
       uint8_t* ptr = &dataBuffer[dataBufferIdx];
       //Send data to processing task through queue. 
       gpio_set_level(4,0);
@@ -134,7 +134,7 @@ void spi_task(void* pvParams)
       //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
       //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
       if(sdBuffIdx >= 480){
-        sd_write_buf(sdBuffer, sdBuffIdx);
+        sd_write_buf(sdBuffer, sdBuffIdx,0);
         sdBuffIdx = 0;
       }
 
@@ -243,8 +243,10 @@ int8_t handleCommand(char cmdString[]){
 
   //Log to file along with tick count.
   FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  if(f != NULL){
   fprintf(f,"%d %s:%s",xTaskGetTickCount(),GatewayCommand_Str[commandNum],data);
   fclose(f);
+  }
 
   ESP_LOGI(TAG,"%s:%s",GatewayCommand_Str[commandNum],data);
   //If we actually want to do something based on the commmand/data.
@@ -297,4 +299,21 @@ int8_t handleCommand(char cmdString[]){
   }
   return 0;
 
+}
+
+void telemTask(void* pvParams){
+
+  count = 0;
+  while(1){
+
+    if(count%)
+    char buf[255];
+    sprintf(buf,"%d: %d,%d,%d\n",AVG_FORCE_DATA,xData[0],yData[0],zData[0]);
+    uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+
+
+    count++;
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+  }
 }

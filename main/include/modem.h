@@ -43,6 +43,7 @@ void spi_task(void* pvParams);
 
 void uart_task(void *arg);
 
+void telemTask(void* pvParams);
 
 
 #endif
