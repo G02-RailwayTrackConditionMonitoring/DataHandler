@@ -11,7 +11,6 @@
 #include "driver/spi_common.h"
 #include "driver/sdmmc_host.h"
 
-
 static const char* TAG= "SD_CARD";
 
 /******************************************/
@@ -146,25 +145,26 @@ void sd_benchmark()
 /******************************************/
 // SD Write
 /******************************************/
-void sd_write_buf(uint8_t buf[], size_t len)
+void sd_write_buf(uint8_t buf[], size_t len, FILE *f)
 {
+  
   int64_t m;
   int64_t m2;
   m = esp_timer_get_time();
   // printf("writing %u bytes to SD\n", len);
   //printf("%s \n", buf);
-  FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
+  // FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
   if (f == NULL)
   {
     ESP_LOGE(TAG, "Failed to open file for writing");
     return;
   }
   m2 = esp_timer_get_time();
-  fwrite(buf, 1, len, f);
+  size_t ret = fwrite(buf, 1, len, f);
   m2 = esp_timer_get_time() - m2;
-  printf("t_write %lld \n", m2);
-  fclose(f);
+  //printf("t_write %lld, %zu bytes \n", m2, ret);
+  //fclose(f);
   m = esp_timer_get_time() - m;
-  printf("t_openfile - t_closefile %lld \n", m);
+  //printf("t_openfile - t_closefile %lld \n", m);
 }
 /******************************************/

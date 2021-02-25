@@ -17,6 +17,7 @@
 #include "sd_card.h"
 #include "GatewayCommands.h"
 
+
 static const char* TAG = "MODEM";
 
 int8_t handleCommand(char cmdString[]);
@@ -83,6 +84,8 @@ esp_err_t init_spi_slave()
 /******************************************/
 void spi_task(void* pvParams)
 {
+  FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
+  int syncCounter = 0 ; 
 
   QueueHandle_t dataQueue = (QueueHandle_t)pvParams;
   //WORD_ALIGNED_ATTR char spiSendBuf[129] = "";
@@ -134,9 +137,18 @@ void spi_task(void* pvParams)
       //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
       //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
       if(sdBuffIdx >= 480){
-        sd_write_buf(sdBuffer, sdBuffIdx);
+         
+        sd_write_buf(sdBuffer, sdBuffIdx, f);
         sdBuffIdx = 0;
+        syncCounter = syncCounter +1; 
+        if(syncCounter == 100){
+          fflush(f);
+          fclose(f); 
+          FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
+          syncCounter = 0; 
+        }
       }
+      
 
       gpio_set_level(4,0);
     }

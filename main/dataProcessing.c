@@ -6,6 +6,9 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include <math.h>
+#include "driver/uart.h"
+#include "GatewayCommands.h"
+#include <string.h>
 
 //DATA PROCESSING CONSTANTS
 #define STDDEV_THRESHOLD 0.01
@@ -19,12 +22,14 @@
 static const char *TAG = "PROCESSING";
 
 void unPackSamples(uint8_t *inBuff, int16_t *x, int16_t *y, int16_t *z, int numSamples, int bufIndex);
-
-int getSignedInt(uint16_t rawValue);
+int compare(const void *a, const void *b);
 
 void processingTask(void *pvParams)
 {
+    char uartSendBuf[255] = "";
 
+    int64_t m1;
+    int64_t m2;
     QueueHandle_t dataQueue = (QueueHandle_t)pvParams;
     uint8_t *dataBuff;
 
@@ -46,7 +51,7 @@ void processingTask(void *pvParams)
     float xSec[3200], ySec[3200], zSec[3200];
     int startIndex = 0; 
     int nowIndex = 0; 
-
+    int interval;   
 
     //vars for station detection and rms calculation
     float xSum, ySum, ySumStd, zSum, yAvg, yStd = 0;
@@ -55,22 +60,58 @@ void processingTask(void *pvParams)
     int stoppedCounter = 0;
     int motionCounter = 0; //do we need MOTION_THRESHOLD ?
     int atStation = 1;  //train is stationary in the beginning
-    int inMotion = 0;  //train is stationary in the beginning    
+    int inMotion = 0;  //train is stationary in the beginning  
+    char buf[255];
+    int getLoc3 = 1; 
+    
 
     while (1)
     {
-        
-
         if (inMotion)
         {
-            
-            if (stoppedCounter > 5)
+            if((stoppedCounter == 3) && (getLoc3 ==1)){
+                sprintf(buf,"%d: %d\n",SET_GPS, 0);
+                uart_write_bytes(2,buf,strlen(buf));
+                getLoc3 = 0;
+            }
+            if (stoppedCounter > 5) 
             {
+                getLoc3 = 1;
                 atStation = 1;
                 inMotion = 0;
                 ESP_LOGI(TAG, "************ ARRIVED AT A STOP 5s AGO ***");      
                 //get percentile and TX data
+           
+                
                 //ON STATION DETECTED
+                interval = (nowIndex-5-startIndex);   
+                // m1 = esp_timer_get_time();
+                qsort(xSec, interval , sizeof(int), compare);
+                qsort(ySec, interval , sizeof(int), compare);
+                qsort(zSec, interval , sizeof(int), compare);
+                //ESP_LOGI(TAG, "Q SORT %d items:  %lld", interval, esp_timer_get_time()-m1); 
+                ESP_LOGI(TAG, "PREVIOUS TRIP DATA: %d %d", startIndex, nowIndex-4);      
+                ESP_LOGI(TAG, "60th Percentile X: %f \n", xSec[(int)(0.6 * interval)]);
+                ESP_LOGI(TAG, "60th Percentile Y: %f \n", ySec[(int)(0.6 * interval)]);
+                ESP_LOGI(TAG, "60th Percentile Z: %f \n", zSec[(int)(0.6 * interval)]);
+
+                //UART Command send
+                
+
+
+                //char buf[255];
+                sprintf(buf,"%d: %f,%f,%f\n",AVG_FORCE_DATA, xSec[(int)(0.6 * interval)],ySec[(int)(0.6 * interval)], zSec[(int)(0.6 * interval)]);
+                uart_write_bytes(2,buf,strlen(buf));
+
+
+                //reset buffer
+                int resetLength = nowIndex<5?nowIndex:5;
+                for (int i=0; i<resetLength; i++){
+                    xSec[i] = xSec[nowIndex-(5-i)];
+                }
+                nowIndex = 5; 
+                startIndex = 0; 
+                
             }
         }
         else if (atStation)
@@ -81,16 +122,39 @@ void processingTask(void *pvParams)
                 inMotion = 1;
                 atStation = 0;
                 //ON MOTION DETECTED
-                //processAndTx()
+                // interval = (nowIndex-5-startIndex);   
+                // m1 = esp_timer_get_time();
+                // qsort(xSec, interval , sizeof(int), compare);
+                // qsort(ySec, interval , sizeof(int), compare);
+                // qsort(zSec, interval , sizeof(int), compare);          
+                // ESP_LOGI(TAG, "Q SORT %d items: %lld", interval, esp_timer_get_time()-m1);                       
+                
+                // ESP_LOGI(TAG, "PREVIOUS STATION DATA: %d %d", startIndex, nowIndex-6);  
+                // ESP_LOGI(TAG, "60th Percentile X: %f \n", xSec[(int)(0.6 * interval)]);
+                // ESP_LOGI(TAG, "60th Percentile Y: %f \n", ySec[(int)(0.6 * interval)]);
+                // ESP_LOGI(TAG, "60th Percentile Z: %f \n", zSec[(int)(0.6 * interval)]);
+
+                //char buf[255];
+                sprintf(buf,"%d: %d\n",SET_GPS, 0);
+                uart_write_bytes(2,buf,strlen(buf));
+
+                //reset buffer    
+                int resetLength = nowIndex<5?nowIndex:5;
+                for (int i=0; i<resetLength; i++){
+                    xSec[i] = xSec[nowIndex-(5-i)];
+                }                
+                nowIndex = 5; 
+                startIndex = 0; 
+                
             }
         }          
-        //Wait until we have data.
-        xQueueReceive(dataQueue, &dataBuff, portMAX_DELAY);
 
+
+        //Wait until we have data.(every 40 samples = 20 ms)
+        xQueueReceive(dataQueue, &dataBuff, portMAX_DELAY);
         //Unpack the data.
         uint8_t node_id = dataBuff[244];
         uint32_t frameNum = *((uint32_t *)&dataBuff[240]);
-
         unPackSamples(dataBuff, xData, yData, zData, 40, bufIndex);
 
         bufIndex = bufIndex + 40;
@@ -98,6 +162,8 @@ void processingTask(void *pvParams)
         // Should processsing be a separeate task from buffering ? Yeah probably..
         if (bufIndex == FS)
         {
+
+            // m1 = esp_timer_get_time();
             xSum = 0;
             ySum = 0;
             ySumStd = 0;
@@ -105,12 +171,9 @@ void processingTask(void *pvParams)
             yAvg = 0;
             yStd = 0;
             bufIndex = 0;   
-            //ESP_LOGI(TAG, " x: %d, y: %d, z:%d", xData[10], yData[10], zData[10]);
-            //ESP_LOGI(TAG, " x: %f, y: %f, z:%f", (float)xData[10] * SCALE_FACTOR, yData[10]*0.00048828, (float)zData[10]*0.00048828);
+            // m2 = esp_timer_get_time();
             for (int i = 0; i < FS; i++)
-            {
-                
-                
+                {
                 x2[i] = pow((xData[i]) * SCALE_FACTOR, 2); 
                 y2[i] = pow((yData[i]) * SCALE_FACTOR, 2); 
                 z2[i] = pow((zData[i]) * SCALE_FACTOR, 2); 
@@ -121,6 +184,7 @@ void processingTask(void *pvParams)
                 zSum = zSum + z2[i];
                 ySumStd = ySumStd + yA[i];
             }
+            // ESP_LOGI(TAG, "LOOP 1 SECOND: %lld",esp_timer_get_time()-m2);      
             yAvg = (ySumStd / FS);
             xSec[nowIndex] = sqrtf(xSum / FS);
             ySec[nowIndex] = sqrtf(ySum / FS);
@@ -147,10 +211,11 @@ void processingTask(void *pvParams)
                    
 
             //LOG
-            ESP_LOGI(TAG, "Processing frame %d from node %d", frameNum, node_id);
-            ESP_LOGI(TAG, "x: %f, y: %f, z:%f, yStd:%f", xSec[second], ySec[second], zSec[second], yStd);
-            ESP_LOGI(TAG, "STOPPED: %d  MOTION: %d",stoppedCounter, motionCounter);      
+            // ESP_LOGI(TAG, "Processing frame %d from node %d", frameNum, node_id);
+            // ESP_LOGI(TAG, "x: %f, y: %f, z:%f, yStd:%f", xSec[nowIndex], ySec[nowIndex], zSec[nowIndex], yStd);
+            // ESP_LOGI(TAG, "STOPPED: %d  MOTION: %d",stoppedCounter, motionCounter);      
             nowIndex= nowIndex+1;  
+            // ESP_LOGI(TAG, "PROCESS 1 SECOND: %lld",esp_timer_get_time()-m1);      
             
         }
     }
@@ -159,7 +224,7 @@ void processingTask(void *pvParams)
 void unPackSamples(uint8_t *inBuff, int16_t *x, int16_t *y, int16_t *z, int numSamples, int startIndex)
 {
     //ESP_LOGI(TAG, "START INDEX %d",startIndex);     
-
+    //int64_t m1= esp_timer_get_time();
     for (int i = 0; i < (numSamples); i++)
     {
         x[i+startIndex] = *((int16_t *)&inBuff[i * 6]);
@@ -167,14 +232,12 @@ void unPackSamples(uint8_t *inBuff, int16_t *x, int16_t *y, int16_t *z, int numS
         z[i+startIndex] = *((int16_t *)&inBuff[i * 6 + 4]);
         //ESP_LOGI(TAG, "%d | x: %d, y: %d, z:%d",i+startIndex, x[i+startIndex], y[i+startIndex], z[i+startIndex]);
     }
-    
+    //ESP_LOGI(TAG, "UNPACK: %lld", esp_timer_get_time()-m1);     
 }
 
-int getSignedInt(uint16_t rawValue)
+
+
+int compare(const void *a, const void *b)
 {
-    if ((rawValue & 0x8000) == 0)
-    {
-        return rawValue;
-    }
-    return (uint16_t)(~(rawValue - 0x01)) * -1;
+    return *((int *)a) - *((int *)b);
 }

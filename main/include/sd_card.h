@@ -28,7 +28,7 @@ esp_err_t init_sd();
 void sd_benchmark();
 
 //Writes data to the sd card.
-void sd_write_buf(uint8_t buf[], size_t len);
+void sd_write_buf(uint8_t buf[], size_t len, FILE *f);
 
 
 #endif
