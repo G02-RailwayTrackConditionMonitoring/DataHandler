@@ -12,6 +12,7 @@
 #include "esp_vfs_fat.h"
 #include "esp_log.h"
 #include <string.h>
+#include <ff.h>
 
 
 #include "sd_card.h"
@@ -117,7 +118,7 @@ void spi_task(void* pvParams)
       //last byte tells which node. for now just ignore the last byte.
       //Empty the SPI rx buffer to a different buffer.
       memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
-      sdBuffIdx += ((t.trans_len / 8)-1);
+      sdBuffIdx += ((t.trans_len / 8)-5);
       uint8_t* ptr = &dataBuffer[dataBufferIdx];
       //Send data to processing task through queue. 
       gpio_set_level(4,0);
@@ -137,16 +138,10 @@ void spi_task(void* pvParams)
       //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
       //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
       if(sdBuffIdx >= 480){
-         
-        sd_write_buf(sdBuffer, sdBuffIdx, f);
+        
+        sd_write_buf(sdBuffer, sdBuffIdx,0);
+
         sdBuffIdx = 0;
-        syncCounter = syncCounter +1; 
-        if(syncCounter == 100){
-          fflush(f);
-          fclose(f); 
-          FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
-          syncCounter = 0; 
-        }
       }
       
 
@@ -255,8 +250,10 @@ int8_t handleCommand(char cmdString[]){
 
   //Log to file along with tick count.
   FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  if(f != NULL){
   fprintf(f,"%d %s:%s",xTaskGetTickCount(),GatewayCommand_Str[commandNum],data);
   fclose(f);
+  }
 
   ESP_LOGI(TAG,"%s:%s",GatewayCommand_Str[commandNum],data);
   //If we actually want to do something based on the commmand/data.
@@ -302,6 +299,8 @@ int8_t handleCommand(char cmdString[]){
                         // ESP_LOGI(TAG,"Log file closed.");
                         break;
     }
+    
+
 
     // default:  ESP_LOGI(TAG,"Received unknown UART command.");
     //           return -1;
@@ -309,4 +308,57 @@ int8_t handleCommand(char cmdString[]){
   }
   return 0;
 
+}
+
+void telemTask(void* pvParams){
+  //This task is used to send commands to the boron at regular intervals.
+  //30 second min interval...
+
+  uint32_t count = 0;
+  while(1){
+
+    //Request a battery value every 2 mins
+    if(count%(2*2) == 0 ){
+      char buf[255];
+      sprintf(buf,"%d: \n",GATEWAY_BATTERY_REQ);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+      ESP_LOGI(TAG,"Requesting gateway battery...");
+    }
+    //Every 6 minutes,have boron get battery and send over LTE.
+    if(count%(6*2) == 0 ){
+      char buf[255];
+      sprintf(buf,"%d: \n",GATEWAY_BATTERY);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+      ESP_LOGI(TAG,"Requesting gateway battery and publish...");
+    }
+
+    if((count+2)%(6*2) == 0){
+
+      FATFS *fs;
+      DWORD fre_clust, free_sect, tot_sect;
+
+      /* Get volume information and free clusters of drive 0 */
+      int res = f_getfree("0:", &fre_clust, &fs);
+      /* Get total sectors and free sectors */
+      tot_sect = (fs->n_fatent - 2) * fs->csize;
+      free_sect = fre_clust * fs->csize;
+
+      /* Print the free space (assuming 512 bytes/sector) */
+      ESP_LOGI(TAG,"%10d KiB total drive space.\n%10d KiB available.\n",tot_sect / 2, (free_sect / 2)/1024);
+
+      char buf[255];
+      sprintf(buf,"%d: %d\n",GATEWAY_FREE_SPACE,(free_sect/2)/1024);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+
+      FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+      if(f != NULL){
+      fprintf(f,"%d %s:%d",xTaskGetTickCount(),GatewayCommand_Str[GATEWAY_FREE_SPACE],free_sect/2/1024);
+      fclose(f);
+      }
+
+    }
+    count++;
+    vTaskDelay(pdMS_TO_TICKS(30000));
+
+  }
 }

@@ -10,8 +10,18 @@
 #include "driver/sdspi_host.h"
 #include "driver/spi_common.h"
 #include "driver/sdmmc_host.h"
+#include <string.h>
+#include <esp_vfs.h>
+
 
 static const char* TAG= "SD_CARD";
+
+FILE* datFile0;
+FILE* datFile1;
+uint16_t datFile0Count;
+uint16_t datFile1Count;
+char datFile0Path[30];
+char datFile1Path[30];
 
 /******************************************/
 // SDIO INIT
@@ -81,8 +91,66 @@ host.slot =VSPI_HOST;
   ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
   
   //Open then close, in "w" mode, to reset the file on startup.
-  FILE *f = fopen(MOUNT_POINT "/testing.txt", "w");
-  fclose(f);
+  // FILE *f = fopen(MOUNT_POINT "/testing.txt", "w");
+
+  uint32_t runIndex =0;
+  //Open the index file, this contains and integer that increments every restart.
+  FILE *indexFile = fopen(MOUNT_POINT "/index.txt","r+");
+  if(indexFile ==NULL){
+    //If file doesn't exist we try to create it.
+    ESP_LOGI(TAG,"Could not open index.txt");
+    indexFile = fopen(MOUNT_POINT "/index.txt","w");
+
+    if(indexFile == NULL){
+      //If we cant create the file the there is somethign wrong.
+      ESP_LOGW(TAG,"Could not create index.txt!");
+    }else{
+      fputs("1",indexFile);
+      fclose(indexFile);
+    }
+  }else{
+
+    char buf[5];
+    fgets(buf,5,indexFile);
+    runIndex = atoi(buf);
+    
+    //Now add one and write to file.
+    fseek(indexFile,0,SEEK_SET);
+    char buf2[5];
+    snprintf(buf2,5,"%d",runIndex+1);
+    fputs(buf2,indexFile);
+    fclose(indexFile);
+
+  }
+  ESP_LOGI(TAG,"ESP32 run index:%d",runIndex);
+  
+  //Also write the run index to the log file.
+  FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  if(f != NULL){
+    fprintf(f,"%d %s:%d\n",xTaskGetTickCount(),"ESP32_RUN_INDEX",runIndex);
+    fclose(f);
+  }
+
+
+  //Open the data files use runIndex in file name, so that we get a unique file each time system is run or restarts.
+  char buf[30];
+  sprintf(datFile0Path,"%s/n%d_r%d.dat",MOUNT_POINT,0,runIndex);
+  datFile0 = fopen(datFile0Path,"a");
+  if(datFile0 == NULL){
+    ESP_LOGW(TAG,"Could not open %s",datFile0Path);
+    //Can't really do anything about this?
+  }
+
+  sprintf(datFile1Path,"%s/n%d_r%d.dat",MOUNT_POINT,1,runIndex);
+  datFile1 = fopen(datFile1Path,"a");
+  if(datFile1 == NULL){
+    ESP_LOGW(TAG,"Could not open %s",datFile1Path);
+    //Can't really do anything about this?
+  }
+
+
+
+  // fclose(f);
   return ret;
 }
 /******************************************/
@@ -145,26 +213,33 @@ void sd_benchmark()
 /******************************************/
 // SD Write
 /******************************************/
-void sd_write_buf(uint8_t buf[], size_t len, FILE *f)
+
+void sd_write_buf(uint8_t buf[], size_t len, uint8_t node_id)
 {
   
-  int64_t m;
-  int64_t m2;
-  m = esp_timer_get_time();
-  // printf("writing %u bytes to SD\n", len);
-  //printf("%s \n", buf);
-  // FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
-  if (f == NULL)
-  {
-    ESP_LOGE(TAG, "Failed to open file for writing");
-    return;
+  if(node_id == 0){
+    fwrite(buf, 1, len,datFile0 );
+    datFile0Count++;
+    
+    //About 1 seconds worth of data is 25 counts. (480 bytes ->80 sample -> 40 ms * 25 = 1 sec)
+    if(datFile0Count > 25){
+       fclose(datFile0);
+       datFile0 = fopen(datFile0Path,"a");
+      datFile0Count =0;
+      //ESP_LOGI(TAG,"Syncing datFile0");
+    }
   }
-  m2 = esp_timer_get_time();
-  size_t ret = fwrite(buf, 1, len, f);
-  m2 = esp_timer_get_time() - m2;
-  //printf("t_write %lld, %zu bytes \n", m2, ret);
-  //fclose(f);
-  m = esp_timer_get_time() - m;
-  //printf("t_openfile - t_closefile %lld \n", m);
+  else if(node_id == 1){
+    fwrite(buf, 1, len,datFile1 );
+    datFile1Count++;
+    
+    if(datFile1Count > 25){
+      fclose(datFile1);
+      datFile0 = fopen(datFile1Path,"a");
+      datFile1Count =0;
+    }
+  }
+ 
+  
 }
 /******************************************/

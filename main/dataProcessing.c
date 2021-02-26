@@ -1,5 +1,6 @@
 #include "dataProcessing.h"
-
+#include "modem.h"
+#include "GatewayCommands.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -218,6 +219,7 @@ void processingTask(void *pvParams)
             // ESP_LOGI(TAG, "PROCESS 1 SECOND: %lld",esp_timer_get_time()-m1);      
             
         }
+
     }
 }
 

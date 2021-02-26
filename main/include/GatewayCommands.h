@@ -22,8 +22,10 @@ typedef enum{
     NODE_FREE_SPACE,
     GATEWAY_FREE_SPACE,
     TIME_UPDATE,
-    NUM_GATEWAY_COMMANDS,
-    SET_GPS
+    GATEWAY_BATTERY_REQ,
+    SET_GPS,
+    NUM_GATEWAY_COMMANDS
+
 } GatewayCommand_t;
 
 extern const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS];

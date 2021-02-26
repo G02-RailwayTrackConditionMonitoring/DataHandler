@@ -11,8 +11,8 @@ const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS]={
     "NODE_FREE_SPACE",
     "GATEWAY_FREE_SPACE",
     "TIME_UPDATE",
-    "NUM_GATEWAY_COMMANDS",
-    "SET_GPS"
+    "GATEWAY_BATTERY_REQ",
+    "SET_GPS",
 };
 
 uint8_t PreparePacket(uint8_t* buffer, GatewayUartPacket* packet){
