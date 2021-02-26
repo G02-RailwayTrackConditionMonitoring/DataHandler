@@ -13,6 +13,7 @@
 #include <string.h>
 #include <esp_vfs.h>
 
+
 static const char* TAG= "SD_CARD";
 
 FILE* datFile0;
@@ -212,30 +213,20 @@ void sd_benchmark()
 /******************************************/
 // SD Write
 /******************************************/
+
 void sd_write_buf(uint8_t buf[], size_t len, uint8_t node_id)
 {
-  int64_t m;
-  int64_t m2;
-  // m = esp_timer_get_time();
-  // printf("writing %u bytes to SD\n", len);
-  //printf("%s \n", buf);
-  //FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
-  // if (f == NULL)
-  // {
-  //   ESP_LOGE(TAG, "Failed to open file for writing");
-  //   return;
-  // }
- //m2 = esp_timer_get_time();
+  
   if(node_id == 0){
     fwrite(buf, 1, len,datFile0 );
     datFile0Count++;
-    ESP_LOGI(TAG,"Writing sd with node 0 data.");
+    
     //About 1 seconds worth of data is 25 counts. (480 bytes ->80 sample -> 40 ms * 25 = 1 sec)
     if(datFile0Count > 25){
        fclose(datFile0);
        datFile0 = fopen(datFile0Path,"a");
       datFile0Count =0;
-      ESP_LOGI(TAG,"Syncing datFile0");
+      //ESP_LOGI(TAG,"Syncing datFile0");
     }
   }
   else if(node_id == 1){
@@ -248,10 +239,7 @@ void sd_write_buf(uint8_t buf[], size_t len, uint8_t node_id)
       datFile1Count =0;
     }
   }
-  //m2 = esp_timer_get_time() - m2;
-  //printf("t_write %lld \n", m2);
-  //fclose(f);
-  //m = esp_timer_get_time() - m;
-  //printf("t_openfile - t_closefile %lld \n", m);
+ 
+  
 }
 /******************************************/
