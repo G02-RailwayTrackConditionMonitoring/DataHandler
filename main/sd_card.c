@@ -141,12 +141,13 @@ host.slot =VSPI_HOST;
     //Can't really do anything about this?
   }
 
-  sprintf(datFile1Path,"%s/n%d_r%d.dat",MOUNT_POINT,1,runIndex);
-  datFile1 = fopen(datFile1Path,"a");
-  if(datFile1 == NULL){
-    ESP_LOGW(TAG,"Could not open %s",datFile1Path);
-    //Can't really do anything about this?
-  }
+  //For the second node...
+  // sprintf(datFile1Path,"%s/n%d_r%d.dat",MOUNT_POINT,1,runIndex);
+  // datFile1 = fopen(datFile1Path,"a");
+  // if(datFile1 == NULL){
+  //   ESP_LOGW(TAG,"Could not open %s",datFile1Path);
+  //   //Can't really do anything about this?
+  // }
 
 
 

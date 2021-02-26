@@ -85,8 +85,8 @@ esp_err_t init_spi_slave()
 /******************************************/
 void spi_task(void* pvParams)
 {
-  FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
-  int syncCounter = 0 ; 
+  //FILE *f = fopen(MOUNT_POINT "/testing.txt", "a");
+  //int syncCounter = 0 ; 
 
   QueueHandle_t dataQueue = (QueueHandle_t)pvParams;
   //WORD_ALIGNED_ATTR char spiSendBuf[129] = "";
@@ -199,37 +199,6 @@ void uart_task(void *arg)
     else{
       uartRxIdx++;
     }
-    // if(uartRxIdx == 1){
-    // //This is always the len byte.
-    //     rxLen = uartRecvBuf[uartRxIdx];
-    // }
-    // uartRxIdx++;
-
-    // //If count = len  then we have a full command.
-    // //If uartRxIdx is 0 or 1 we don't have a valid length yet.
-    // if((uartRxIdx >= rxLen) && uartRxIdx>1){
-    //     uartRxIdx = 0;
-    //     rxLen = 0;
-
-        
-    //     GetPacket((uint8_t*)uartRecvBuf,&packet);
-    //     handleCommand(packet);
-    // }
-
-  
-    // sprintf(uartSendBuf, "%d Testing UART\n",tx_count);
-    // printf("****\n");
-    // printf("Transmitting %d bytes: %s \n", sizeof(uartSendBuf), uartSendBuf);
-    // uart_write_bytes(ECHO_UART_PORT_NUM, uartSendBuf, bytesToSend);
-    
-    // printf("Received: %s\n", uartRecvBuf);
-    // printf("****\n");
-    // tx_count++;
-
-    // packet.data.int16[0] = tx_count;
-    // bytesToSend = PreparePacket((uint8_t*)uartSendBuf,&packet);
-
-    // vTaskDelay(pdMS_TO_TICKS(60000));//Every 2 minutes
   }
 }
 
