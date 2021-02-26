@@ -12,6 +12,7 @@
 #include "esp_vfs_fat.h"
 #include "esp_log.h"
 #include <string.h>
+#include <ff.h>
 
 
 #include "sd_card.h"
@@ -292,6 +293,8 @@ int8_t handleCommand(char cmdString[]){
                         // ESP_LOGI(TAG,"Log file closed.");
                         break;
     }
+    
+
 
     // default:  ESP_LOGI(TAG,"Received unknown UART command.");
     //           return -1;
@@ -302,18 +305,54 @@ int8_t handleCommand(char cmdString[]){
 }
 
 void telemTask(void* pvParams){
+  //This task is used to send commands to the boron at regular intervals.
+  //30 second min interval...
 
-  count = 0;
+  uint32_t count = 0;
   while(1){
 
-    if(count%)
-    char buf[255];
-    sprintf(buf,"%d: %d,%d,%d\n",AVG_FORCE_DATA,xData[0],yData[0],zData[0]);
-    uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+    //Request a battery value every 2 mins
+    if(count%(2*2) == 0 ){
+      char buf[255];
+      sprintf(buf,"%d: \n",GATEWAY_BATTERY_REQ);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+      ESP_LOGI(TAG,"Requesting gateway battery...");
+    }
+    //Every 6 minutes,have boron get battery and send over LTE.
+    if(count%(6*2) == 0 ){
+      char buf[255];
+      sprintf(buf,"%d: \n",GATEWAY_BATTERY);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+      ESP_LOGI(TAG,"Requesting gateway battery and publish...");
+    }
 
+    if((count+2)%(6*2) == 0){
 
+      FATFS *fs;
+      DWORD fre_clust, free_sect, tot_sect;
+
+      /* Get volume information and free clusters of drive 0 */
+      int res = f_getfree("0:", &fre_clust, &fs);
+      /* Get total sectors and free sectors */
+      tot_sect = (fs->n_fatent - 2) * fs->csize;
+      free_sect = fre_clust * fs->csize;
+
+      /* Print the free space (assuming 512 bytes/sector) */
+      ESP_LOGI(TAG,"%10d KiB total drive space.\n%10d KiB available.\n",tot_sect / 2, (free_sect / 2)/1024);
+
+      char buf[255];
+      sprintf(buf,"%d: %d\n",GATEWAY_FREE_SPACE,(free_sect/2)/1024);
+      uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+
+      FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+      if(f != NULL){
+      fprintf(f,"%d %s:%d",xTaskGetTickCount(),GatewayCommand_Str[GATEWAY_FREE_SPACE],free_sect/2/1024);
+      fclose(f);
+      }
+
+    }
     count++;
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(30000));
 
   }
 }

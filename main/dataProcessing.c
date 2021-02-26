@@ -38,11 +38,11 @@ void processingTask(void * pvParams){
     ESP_LOGI(TAG,"Processing frame %d from node %d",frameNum,node_id);
     ESP_LOGI(TAG,"x: %d, y: %d, z:%d",xData[0],yData[0],zData[0]);
 
-    if(frameNum%500 ==0){
-        char buf[255];
-        sprintf(buf,"%d: %d,%d,%d\n",AVG_FORCE_DATA,xData[0],yData[0],zData[0]);
-        uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
-    }
+    // if(frameNum%500 ==0){
+    //     char buf[255];
+    //     sprintf(buf,"%d: %d,%d,%d\n",AVG_FORCE_DATA,xData[0],yData[0],zData[0]);
+    //     uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));
+    // }
     }
 
 }
