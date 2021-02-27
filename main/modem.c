@@ -175,7 +175,7 @@ void init_uart()
 void uart_task(void *arg)
 {
   
-  char uartRecvBuf[255] = "";
+  char uartRecvBuf[550] = "";
   uint8_t uartRxIdx = 0;
   //uint8_t rxLen = 0;
   //GatewayUartPacket packet;
@@ -294,7 +294,7 @@ void telemTask(void* pvParams){
       ESP_LOGI(TAG,"Requesting gateway battery...");
     }
     //Every 6 minutes,have boron get battery and send over LTE.
-    if(count%(6*2) == 0 ){
+    if((count+4)%(6*2) == 0 ){
       char buf[255];
       sprintf(buf,"%d: \n",GATEWAY_BATTERY);
       uart_write_bytes(ECHO_UART_PORT_NUM, buf, strlen(buf));

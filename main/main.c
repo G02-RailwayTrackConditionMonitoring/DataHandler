@@ -178,7 +178,7 @@ void app_main(void)
   fprintf(f,"%d ESP32_POWER_ON \n",xTaskGetTickCount());
   fclose(f);
 
-  dataQueue = xQueueCreate(10,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
+  dataQueue = xQueueCreate(20,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
   //xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
   xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
   xTaskCreate(&uart_task, "uart-receive", 4096,NULL, 3, NULL);
