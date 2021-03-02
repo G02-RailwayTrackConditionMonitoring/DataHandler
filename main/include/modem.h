@@ -45,6 +45,7 @@ void uart_task(void *arg);
 
 void telemTask(void* pvParams);
 
-extern float threshold; 
+extern float threshold;
+extern int mode;  
 
 #endif

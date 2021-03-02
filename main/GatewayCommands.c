@@ -16,6 +16,7 @@ const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS]={
     "SET_START_TIME", 
     "SET_END_TIME",   
     "SET_THRESHOLD", 
+    "SET_MODE",
 };
 
 uint8_t PreparePacket(uint8_t* buffer, GatewayUartPacket* packet){
