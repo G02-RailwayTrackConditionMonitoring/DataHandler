@@ -25,6 +25,7 @@
     "spi_slave.h": "c",
     "gpio.h": "c",
     "uart.h": "c",
-    "himem.h": "c"
+    "himem.h": "c",
+    "modem.h": "c"
   }
 }
