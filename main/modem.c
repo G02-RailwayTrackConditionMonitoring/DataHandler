@@ -26,6 +26,8 @@ int8_t handleCommand(char cmdString[]);
 uint8_t dataBuffer[10*245];
 uint16_t dataBufferIdx=0;
 
+float threshold  = 0.01; 
+
 /******************************************/
 // SPI
 /******************************************/
@@ -227,6 +229,12 @@ int8_t handleCommand(char cmdString[]){
   ESP_LOGI(TAG,"%s:%s",GatewayCommand_Str[commandNum],data);
   //If we actually want to do something based on the commmand/data.
   switch(commandNum){
+    case SET_THRESHOLD: {
+                        ESP_LOGI(TAG,"SETTING THRESHOLD: %s",data);
+                        threshold = atoi(data); 
+                        threshold = threshold/100;
+                        ESP_LOGI(TAG,"SETTING THRESHOLD: %f",threshold);
+    }
 
     case BLE_CONNECTION_EVENT:{
                                 // uint8_t con = packet.data.uint8[0];

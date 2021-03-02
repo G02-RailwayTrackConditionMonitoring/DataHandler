@@ -49,6 +49,8 @@
 QueueHandle_t dataQueue;
 static const char* TAG = "CONFIG";
 
+ 
+
 /******************************************/
 // BLINKY
 /******************************************/
@@ -179,7 +181,7 @@ void app_main(void)
   fclose(f);
 
   dataQueue = xQueueCreate(20,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
-  //xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
+  xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
   xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
   xTaskCreate(&uart_task, "uart-receive", 4096,NULL, 3, NULL);
   xTaskCreate(&processingTask,"processing",32768*2,(void*)dataQueue,2,NULL);

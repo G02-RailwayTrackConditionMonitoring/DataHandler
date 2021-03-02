@@ -24,6 +24,9 @@ typedef enum{
     TIME_UPDATE,
     GATEWAY_BATTERY_REQ,
     SET_GPS,
+    SET_START_TIME, 
+    SET_END_TIME,
+    SET_THRESHOLD,
     NUM_GATEWAY_COMMANDS
 
 } GatewayCommand_t;
