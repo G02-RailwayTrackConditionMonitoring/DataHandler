@@ -28,6 +28,7 @@ typedef enum{
     SET_END_TIME,
     SET_THRESHOLD,
     SET_MODE,
+    TX_STD_Y,
     NUM_GATEWAY_COMMANDS
 
 } GatewayCommand_t;

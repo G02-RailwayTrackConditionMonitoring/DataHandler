@@ -205,6 +205,10 @@ void processingTask(void *pvParams)
                 motionCounter = motionCounter + 1;
             }
 
+            //send yStd to boron
+            sprintf(buf, "%d: %d\n", TX_STD_Y, yStd);
+            uart_write_bytes(2, buf, strlen(buf));
+
             //LOG
             //ESP_LOGI(TAG, "Processing frame %d from node %d", frameNum, node_id);
             ESP_LOGI(TAG, "  FINAL | xSum: %f, ySum: %f, zSum:%f, yStdSum:%f", xSum, ySum, zSum, ySumStd);
