@@ -107,49 +107,54 @@ void spi_task(void* pvParams)
     t.length = 256*8;
     t.tx_buffer = spiSendBuf;
     t.rx_buffer = spiRecvBuf;
-    spi_slave_queue_trans(HSPI_HOST, &t, portMAX_DELAY);
-    esp_err_t ret = spi_slave_get_trans_result(HSPI_HOST, &t, portMAX_DELAY);
-    assert(ret == ESP_OK);
-    gpio_set_level(4,0);
-    //printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
-    //ESP_LOGI(TAG,"received %d bytes",t.trans_len/8);
-    //Make sure we ahve real data otherwise we get hard fault.
-    if((t.trans_len/8) > (8*5)){
-      
-      gpio_set_level(4,1);
-      //last byte tells which node. for now just ignore the last byte.
-      //Empty the SPI rx buffer to a different buffer.
-      memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
-      sdBuffIdx += ((t.trans_len / 8)-5);
-      uint8_t* ptr = &dataBuffer[dataBufferIdx];
-      //Send data to processing task through queue. 
+    // if(spiInitGood == ESP_OK){
+      spi_slave_queue_trans(HSPI_HOST, &t, portMAX_DELAY);
+      esp_err_t ret = spi_slave_get_trans_result(HSPI_HOST, &t, portMAX_DELAY);
+      assert(ret == ESP_OK);
       gpio_set_level(4,0);
-
-      memcpy(ptr,spiRecvBuf,245);
-      gpio_set_level(4,1);
-      BaseType_t err =  xQueueSendToBack(dataQueue,&ptr,0);
-      gpio_set_level(4,0);
-      dataBufferIdx = (dataBufferIdx+245)%(10*245);
-      //printf("buf idx %d\n",dataBufferIdx);
-      if(err != pdTRUE){ 
-        ESP_LOGW(TAG,"processing queue full!");
-        //Should write this to the sd card log.
-      }
-
-      gpio_set_level(4,1);
-      //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
-      //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
-      if(sdBuffIdx >= 480){
+      //printf("Received %u bytes: %x %x %x %x \n", t.trans_len / 8, spiRecvBuf[0],spiRecvBuf[1],spiRecvBuf[2],spiRecvBuf[3]);
+      //ESP_LOGI(TAG,"received %d bytes",t.trans_len/8);
+      //Make sure we ahve real data otherwise we get hard fault.
+      if((t.trans_len/8) > (8*5)){
         
-        sd_write_buf(sdBuffer, sdBuffIdx,0);
+        gpio_set_level(4,1);
+        //last byte tells which node. for now just ignore the last byte.
+        //Empty the SPI rx buffer to a different buffer.
+        memcpy(&sdBuffer[sdBuffIdx],spiRecvBuf,(t.trans_len / 8)-1);
+        sdBuffIdx += ((t.trans_len / 8)-5);
+        uint8_t* ptr = &dataBuffer[dataBufferIdx];
+        //Send data to processing task through queue. 
+        gpio_set_level(4,0);
 
-        sdBuffIdx = 0;
+        memcpy(ptr,spiRecvBuf,245);
+        gpio_set_level(4,1);
+        BaseType_t err =  xQueueSendToBack(dataQueue,&ptr,0);
+        gpio_set_level(4,0);
+        dataBufferIdx = (dataBufferIdx+245)%(10*245);
+        //printf("buf idx %d\n",dataBufferIdx);
+        if(err != pdTRUE){ 
+          ESP_LOGW(TAG,"processing queue full!");
+          //Should write this to the sd card log.
+        }
+
+        gpio_set_level(4,1);
+        //Wait till we have around 512 bytes, since the writes take aprox the same amount of time, but half as frequent.
+        //ESP_LOGI(TAG,"sd buffer index:%d",sdBuffIdx);
+        if(sdBuffIdx >= 480){
+          
+          sd_write_buf(sdBuffer, sdBuffIdx,0);
+
+          sdBuffIdx = 0;
+        }
+        
+
+        gpio_set_level(4,0);
       }
-      
-
-      gpio_set_level(4,0);
-    }
+    // }
+    // else{
+    //   vTaskDelay(10*1000); //If spi is not init then it will be up to 10 seconds before it would be init by main loop.
     
+    // }
   }
 }
 /******************************************/

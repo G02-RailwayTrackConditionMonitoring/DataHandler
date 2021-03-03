@@ -47,5 +47,6 @@ void telemTask(void* pvParams);
 
 extern float threshold; 
 extern int mode; 
+// extern esp_err_t spiInitGood;
 
 #endif

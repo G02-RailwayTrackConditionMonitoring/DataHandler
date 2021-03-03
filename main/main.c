@@ -48,7 +48,7 @@
 
 QueueHandle_t dataQueue;
 static const char* TAG = "CONFIG";
-
+esp_err_t spiInitGood;
  
 
 /******************************************/
@@ -160,7 +160,8 @@ void app_main(void)
   esp_err_t ret;
 
   init_uart(); //error checking happens in here..
-  esp_err_t spiInitGood = init_spi_slave();
+  spiInitGood = init_spi_slave();
+  // spiInitGood = ESP_ERR_NOT_FOUND;
   if (spiInitGood != ESP_OK)
   {
     printf("ERROR INITIALIZING SPI");
@@ -181,7 +182,7 @@ void app_main(void)
 
   dataQueue = xQueueCreate(20,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
   xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
-  xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
+  if(spiInitGood == ESP_OK) xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
   xTaskCreate(&uart_task, "uart-receive", 4096,NULL, 3, NULL);
   xTaskCreate(&processingTask,"processing",32768*2,(void*)dataQueue,2,NULL);
   xTaskCreate(&telemTask,"Telem task",2048,NULL,2,NULL);
@@ -196,7 +197,9 @@ void app_main(void)
     if(spiInitGood!= ESP_OK){
 
       spiInitGood = init_spi_slave();
+      if(spiInitGood == ESP_OK) xTaskCreate(&spi_task, "spi-receive", 2600, (void*)dataQueue, 4, NULL); //SD Write is daisy chained to this. Should be highest priority.
     }
+    
     vTaskDelay(pdMS_TO_TICKS(10*1000));//Retry every 10 seconds.
   }
   //xTaskCreate(&sd_benchmark, "sd-write", 2048, NULL, 2, NULL);
