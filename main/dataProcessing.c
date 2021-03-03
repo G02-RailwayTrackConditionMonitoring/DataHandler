@@ -205,6 +205,15 @@ void processingTask(void *pvParams)
                 motionCounter = motionCounter + 1;
             }
 
+            sprintf(buf, "%d: %.3f\n", TX_STD_Y, yStd);
+            uart_write_bytes(2, buf, strlen(buf));
+            sprintf(buf, "%d: %.3f\n", TX_RMS_X, xSec[nowIndex]);
+            uart_write_bytes(2, buf, strlen(buf));            
+            sprintf(buf, "%d: %.3f\n", TX_RMS_Y, ySec[nowIndex]);
+            uart_write_bytes(2, buf, strlen(buf));
+            sprintf(buf, "%d: %.3f\n", TX_RMS_Z, zSec[nowIndex]);
+            uart_write_bytes(2, buf, strlen(buf));          
+              
             //LOG
             //ESP_LOGI(TAG, "Processing frame %d from node %d", frameNum, node_id);
             ESP_LOGI(TAG, "  FINAL | xSum: %f, ySum: %f, zSum:%f, yStdSum:%f", xSum, ySum, zSum, ySumStd);
@@ -212,6 +221,7 @@ void processingTask(void *pvParams)
             ESP_LOGI(TAG, "STOPPED: %d  MOTION: %d", stoppedCounter, motionCounter);
             ESP_LOGI(TAG, "THRESHOLD: %f", threshold);
             
+
             
             if(nowIndex>=3600){ //reset  because buffer is only 3600 seconds long 
                  nowIndex = 0; 

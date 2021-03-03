@@ -29,6 +29,9 @@ typedef enum{
     SET_THRESHOLD,
     SET_MODE, 
     TX_STD_Y,
+    TX_RMS_X,
+    TX_RMS_Y,
+    TX_RMS_Z,    
     NUM_GATEWAY_COMMANDS
 
 } GatewayCommand_t;

@@ -18,6 +18,9 @@ const char* GatewayCommand_Str[NUM_GATEWAY_COMMANDS]={
     "SET_THRESHOLD", 
     "SET_MODE",
     "TX_STD_Y",
+    "TX_RMS_X",
+    "TX_RMS_Y",
+    "TX_RMS_Z",    
 };
 
 uint8_t PreparePacket(uint8_t* buffer, GatewayUartPacket* packet){

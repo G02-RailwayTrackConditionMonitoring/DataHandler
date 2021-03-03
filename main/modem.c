@@ -232,12 +232,14 @@ int8_t handleCommand(char cmdString[]){
     case SET_MODE: {                  
                     mode = atoi(data); 
                     ESP_LOGI(TAG,"SETTING MODE: %d",mode);
+                    break;
 }
     case SET_THRESHOLD: {
                         ESP_LOGI(TAG,"SETTING THRESHOLD: %s",data);
                         threshold = atoi(data); 
                         threshold = threshold/100;
                         ESP_LOGI(TAG,"SETTING THRESHOLD: %f",threshold);
+                        break;
     }
 
     case BLE_CONNECTION_EVENT:{
