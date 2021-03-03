@@ -160,25 +160,24 @@ void app_main(void)
   esp_err_t ret;
 
   init_uart(); //error checking happens in here..
-
-  if (init_spi_slave() != ESP_OK)
+  esp_err_t spiInitGood = init_spi_slave();
+  if (spiInitGood != ESP_OK)
   {
     printf("ERROR INITIALIZING SPI");
-    while (1)
-    {
-    };
+
   };
-  if (init_sd() != ESP_OK)
+  esp_err_t sdInitGood =init_sd() ;
+  if (sdInitGood!= ESP_OK)
   {
     printf("ERROR INITIALIZING SD");
-    while (1)
-    {
-    };
+
   };
 
   FILE *f = fopen(MOUNT_POINT "/log.txt", "a");
+  if(f!=NULL){
   fprintf(f,"%d ESP32_POWER_ON \n",xTaskGetTickCount());
   fclose(f);
+  }
 
   dataQueue = xQueueCreate(20,sizeof(uint8_t*));//10 items, each a pointer to a buffer.
   xTaskCreate(&blinky, "blink-led", 2048, NULL, 2, NULL);
@@ -187,6 +186,18 @@ void app_main(void)
   xTaskCreate(&processingTask,"processing",32768*2,(void*)dataQueue,2,NULL);
   xTaskCreate(&telemTask,"Telem task",2048,NULL,2,NULL);
 
+  while(1){
 
+    if(sdInitGood != ESP_OK){
+    
+        sdInitGood =init_sd() ;
+    }
+
+    if(spiInitGood!= ESP_OK){
+
+      spiInitGood = init_spi_slave();
+    }
+    vTaskDelay(pdMS_TO_TICKS(10*1000));//Retry every 10 seconds.
+  }
   //xTaskCreate(&sd_benchmark, "sd-write", 2048, NULL, 2, NULL);
 }

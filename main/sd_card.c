@@ -77,11 +77,14 @@ esp_err_t init_sd()
 host.slot =VSPI_HOST;
 
   ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CHAN);
-  if (ret != ESP_OK) {
+  if(ret  == ESP_ERR_INVALID_STATE){
+    //If retrying spi can already be init which gives this error. just ignore?
+  }
+  else if (ret != ESP_OK  ) {
       ESP_LOGE(TAG, "Failed to initialize bus.");
       return ret;
   }
-
+  
   // This initializes the slot without card detect (CD) and write protect (WP) signals.
   // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
   sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
@@ -218,7 +221,7 @@ void sd_benchmark()
 void sd_write_buf(uint8_t buf[], size_t len, uint8_t node_id)
 {
   
-  if(node_id == 0){
+  if(node_id == 0 && datFile0 != NULL){
     fwrite(buf, 1, len,datFile0 );
     datFile0Count++;
     
@@ -230,7 +233,7 @@ void sd_write_buf(uint8_t buf[], size_t len, uint8_t node_id)
       //ESP_LOGI(TAG,"Syncing datFile0");
     }
   }
-  else if(node_id == 1){
+  else if(node_id == 1 && datFile1 != NULL){
     fwrite(buf, 1, len,datFile1 );
     datFile1Count++;
     
